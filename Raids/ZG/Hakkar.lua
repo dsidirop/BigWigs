@@ -8,13 +8,15 @@ module.defaultDB = {
 	enrage = false,
 }
 
+local _, playerClass = UnitClass("player")
+
 L:RegisterTranslations("enUS", function()
 	return {
 		cmd = "Hakkar",
 
 		mc_cmd = "mc",
 		mc_name = "Mind Control Alert",
-		mc_desc = "Warn for Mind Control",
+		mc_desc = "Warn for Mind Control. Click bar to target victim (and cast Sheep/Fear if mage/warlock).",
 
 		siphon_cmd = "siphon",
 		siphon_name = "Blood Siphon Alert",
@@ -57,8 +59,10 @@ L:RegisterTranslations("enUS", function()
 		trigger_causeInsanityOther = "(.+) is afflicted by Cause Insanity.", --CHAT_MSG_SPELL_PERIODIC_HOSTILEPLAYER_DAMAGE // CHAT_MSG_SPELL_PERIODIC_PARTY_DAMAGE // CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_DAMAGE
 		trigger_causeInsanityFade = "Cause Insanity fades from (.+).", --CHAT_MSG_SPELL_AURA_GONE_SELF // CHAT_MSG_SPELL_AURA_GONE_PARTY // CHAT_MSG_SPELL_AURA_GONE_OTHER
 		trigger_causeInsanityTotem = "Hakkar's Cause Insanity fails. Grounding Totem is immune.", --CHAT_MSG_SPELL_CREATURE_VS_CREATURE_DAMAGE // CHAT_MSG_SPELL_CREATURE_VS_PARTY_DAMAGE
-		msg_causeInsanity = " MC",
-		bar_causeInsanity = " MC",
+		msg_causeInsanity = " Mind-Controlled!",
+		bar_causeInsanity = (playerClass=="MAGE" and " MC >sheep<") or (playerClass=="WARLOCK" and " MC >fear<") or " MC >target<",
+		spell_causeInsanity = (playerClass=="MAGE" and "Polymorph") or (playerClass=="WARLOCK" and "Fear") or false,
+		bar_causeInsanityGrounded = "MC Grounded",
 		bar_causeInsanityCd = "MC CD",
 
 		trigger_bloodSiphon = "Hakkar gains Blood Siphon.", --CHAT_MSG_SPELL_PERIODIC_CREATURE_BUFFS
@@ -435,17 +439,13 @@ function module:CauseInsanity(rest)
 	self:RemoveBar(L["bar_causeInsanityCd"])
 
 	if rest == "Grounded!" then
-		self:Bar("Grounded -" .. L["bar_causeInsanity"], timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
+		self:Bar(L["bar_causeInsanityGrounded"], timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
 		self:DelayedBar(timer.causeInsanityDur, L["bar_causeInsanityCd"], timer.causeInsanityCd, icon.causeInsanity, true, color.causeInsanityCd)
 	else
-		self:Bar(rest .. L["bar_causeInsanity"] .. " >Click Me<", timer.causeInsanityDur, icon.causeInsanity, true, color.causeInsanityDur)
-		self:SetCandyBarOnClick("BigWigsBar " .. rest .. L["bar_causeInsanity"] .. " >Click Me<", function(name, button, extra)
-			TargetByName(extra, true)
-		end, rest)
-
-		if UnitClass("Player") == "Mage" or UnitClass("Player") == "Warlock" then
-			self:Message(rest .. L["msg_causeInsanity"], "Attention", false, nil, false)
-			self:Sound("Info")
+		self:ClickBar(rest .. L["bar_causeInsanity"], timer.causeInsanityDur, icon.causeInsanity, rest, L["spell_causeInsanity"], true, color.causeInsanityDur)
+		
+		if playerClass == "MAGE" or playerClass == "WARLOCK" then
+			self:Message(rest .. L["msg_causeInsanity"], "Attention", false, "Info", false)
 			self:WarningSign(icon.causeInsanity, 0.7)
 		end
 
@@ -460,7 +460,7 @@ function module:CauseInsanity(rest)
 end
 
 function module:CauseInsanityFade(rest)
-	self:RemoveBar(rest .. L["bar_causeInsanity"] .. " >Click Me<")
+	self:RemoveBar(rest .. L["bar_causeInsanity"])
 
 	if (IsRaidLeader() or IsRaidOfficer()) then
 		for i = 1, GetNumRaidMembers() do
@@ -472,10 +472,10 @@ function module:CauseInsanityFade(rest)
 
 	self:Bar(L["bar_causeInsanityCd"], timer.causeInsanityCd, icon.causeInsanity, true, color.causeInsanityCd)
 
-	if UnitClass("Player") == "Priest" then
+	if playerClass == "PRIEST" then
 		self:WarningSign(icon.priestDispel, 0.7)
 		self:Sound("Info")
-	elseif UnitClass("Player") == "Paladin" then
+	elseif playerClass == "PALADIN" then
 		self:WarningSign(icon.paladinDispel, 0.7)
 		self:Sound("Info")
 	end
@@ -525,7 +525,7 @@ function module:AspectJeklik()
 	self:Bar(L["bar_aspectOfJeklikDur"], timer.jeklikDur, icon.jeklik, true, color.jeklikDur)
 	self:DelayedBar(timer.jeklikDur, L["bar_aspectOfJeklikCd"], timer.jeklikCd, icon.jeklik, true, color.jeklikCd)
 
-	if UnitClass("Player") == "Priest" or UnitClass("Player") == "Paladin" then
+	if playerClass == "PRIEST" or playerClass == "PALADIN" then
 		self:WarningSign(icon.jeklik, 0.7)
 		self:Sound("Info")
 	end
@@ -554,7 +554,7 @@ function module:AspectThekalStart()
 
 	self:Bar(L["bar_aspectOfThekalDur"], timer.thekalDur, icon.thekal, true, color.thekalDur)
 
-	if UnitClass("Player") == "Hunter" then
+	if playerClass == "HUNTER" then
 		self:Message(L["msg_aspectOfThekal"], "Important", false, nil, false)
 		self:Sound("Info")
 		self:WarningSign(icon.thekal, 1)
