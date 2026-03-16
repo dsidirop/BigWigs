@@ -777,6 +777,7 @@ function BigWigsCommonAuras:BigWigs_RecvSync(sync, rest, nick)
 			self:PFUIFocus(rest)
 		end
 	elseif self.db.profile.fearward and sync == "BWCAFW" and rest then
+		if tonumber(rest) then rest = "?" end -- cosmetic fix for timestamp sync
 		self:TriggerEvent("BigWigs_Message", nick .. L["msg_fearward"] .. rest, "Positive", false, nil, false)
 		self:TriggerEvent("BigWigs_StartBar", self, nick .. L["bar_fearward"], timer.fearward, icon.fearward, true, color.fearward)
 	elseif self.db.profile.shieldwall and sync == "BWCASW" then
@@ -810,6 +811,7 @@ function BigWigsCommonAuras:BigWigs_RecvSync(sync, rest, nick)
 
 	elseif self.db.profile.spiritlink and sync == "BWCASL" and rest then
 		-- self:TriggerEvent("BigWigs_Message", L["msg_spiritLink"] .. rest, "Important", false, nil, false) -- noise
+		if tonumber(rest) then rest = nick end -- cosmetic fix for timestamp sync
 		self:TriggerEvent("BigWigs_Sound", "Info")
 		self:TriggerEvent("BigWigs_StartBar", self, rest .. L["bar_spiritLink"], timer.spiritLink, icon.spiritLink, true, color.spiritLink, nil, nil, nil, nil, nil, nil, nil, nil, nil, true, nick, false)
 
