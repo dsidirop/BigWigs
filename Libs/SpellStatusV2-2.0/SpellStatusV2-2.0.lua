@@ -476,22 +476,32 @@ function CastOriginal(self, methodName, param1, param2, param3, sId, sName, sRan
 end
 
 function SpellStatusV2:CastSpellByName(spellName, onSelf)
-	self:LevelDebug(2, ">>>> CastSpellByName", spellName, onSelf)
+    if spellName == nil then return end -- nasty bug with nampower after in twow 1.18+
 
-	local sName, sId, sRank, sFullName
-	sName, sRank, sId, sFullName = spellcache:GetSpellData(spellName)
+    self:LevelDebug(2, ">>>> CastSpellByName", spellName, onSelf)
 
-	CastOriginal(self, "CastSpellByName", spellName, onSelf, nil, sId, sName, sRank, sFullName)
+    local sName, sId, sRank, sFullName
+    sName, sRank, sId, sFullName = spellcache:GetSpellData(spellName)
+    if sName == nil then
+        return
+    end
 
-	self:LevelDebug(2, "<<<< CastSpellByName2", spellName, onSelf)
+    CastOriginal(self, "CastSpellByName", spellName, onSelf, nil, sId, sName, sRank, sFullName)
+
+    self:LevelDebug(2, "<<<< CastSpellByName2", spellName, onSelf)
 end
 
 function SpellStatusV2:CastSpell(spellId, spellbookType)
+    if spellId == nil then return end -- nasty bug with nampower after in twow 1.18+
+    
 	self:LevelDebug(2, ">>>> CastSpell", spellId, spellbookType)
 
 	local sId, sName, sRank, sFullName
 	if (spellbookType == BOOKTYPE_SPELL) then
 		sName, sRank, sId, sFullName = spellcache:GetSpellData(spellId)
+        if sName == nil then
+            return
+        end
 	end
 
 	CastOriginal(self, "CastSpell", spellId, spellbookType, nil, sId, sName, sRank, sFullName)
