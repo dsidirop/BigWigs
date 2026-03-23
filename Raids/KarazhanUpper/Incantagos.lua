@@ -1,9 +1,9 @@
 local module, L = BigWigs:ModuleDeclaration("Ley-Watcher Incantagos", "Karazhan")
 
 -- module variables
-module.revision = 30003
+module.revision = 30005
 module.enabletrigger = module.translatedName
-module.toggleoptions = { "leyline", "affinity", "targetBlack", "targetBlue", "targetCrystal", "targetGreen", "targetMana", "targetRed", -1, "surgewarning", "surgesay", "summonseeker", "summonwhelps", "summoncd", -1, "beam", "blizzard", "proximity", "cursewarning", "bosskill"}
+module.toggleoptions = { "leyline", "affinity", "targetBlack", "targetBlue", "targetCrystal", "targetGreen", "targetMana", "targetRed", -1, "surgewarning", "surgesay", "summonseeker", "summonwhelps", -1, "beam", "blizzard", "proximity", "cursewarning", "bosskill"}
 module.zonename = {
 	AceLibrary("AceLocale-2.2"):new("BigWigs")["Tower of Karazhan"],
 	AceLibrary("Babble-Zone-2.2")["Tower of Karazhan"],
@@ -25,7 +25,6 @@ module.defaultDB = {
 	surgesay = true,
 	summonseeker = true,
 	summonwhelps = true,
-	summoncd = false,
 	beam = true,
 	blizzard = true,
 	proximity = false,
@@ -78,16 +77,12 @@ L:RegisterTranslations("enUS", function()
 		surgesay_desc = "Call for help in /say when you get Surge of Mana",
 
 		summonseeker_cmd = "summonseeker",
-		summonseeker_name = "Summon Ley-Seeker Alert",
-		summonseeker_desc = "Warns when Ley-Watcher Incantagos summons Manascale Ley-Seeker",
+		summonseeker_name = "Ley-Seeker summon Alert and timer between summons",
+		summonseeker_desc = "Warns when Ley-Watcher Incantagos summons a Manascale Ley-Seeker and displays the time until the next summon",
 
 		summonwhelps_cmd = "summonwhelps",
-		summonwhelps_name = "Summon Whelps Alert",
-		summonwhelps_desc = "Warns when Ley-Watcher Incantagos summons Manascale Whelps",
-
-		summoncd_cmd = "summoncd",
-		summoncd_name = "Summon Cooldown Timer",
-		summoncd_desc = "Shows a timer bar for the minimum cooldown of the next possible wave of summons",
+		summonwhelps_name = "Whelps summon Alert and timer between summons",
+		summonwhelps_desc = "Warns when Ley-Watcher Incantagos summons Manascale Whelps and displays the time until the next summon",
 
 		beam_cmd = "beam",
 		beam_name = "Guided Ley-Beam Alert",
@@ -160,12 +155,14 @@ L:RegisterTranslations("enUS", function()
 		yell_surge = "Help me! (Surge of Mana)",
 
 		trigger_summonSeekerCast = "Watcher Incantagos begins to cast Summon Manascale Ley",
+		bar_summonSeekerCast = "Ley-Seeker Summoning",
+		bar_summonSeekerCD = "Next Ley-Seeker spawn",
 		msg_summonSeeker = "Manascale Ley-Seeker spawning in 2 sec!",
 
 		trigger_summonWhelpsCast = "Watcher Incantagos begins to cast Summon Manascale Whelps",
+		bar_summonWhelpsCast = "Whelps Summoning",
+		bar_summonWhelpsCD = "Next Whelps spawn",
 		msg_summonWhelps = "Manascale Whelps spawning in 2 sec!",
-		
-		bar_summonCD = "Next Summon Wave",
 
 		trigger_leyBeamGain = "(.+) gain.? Guided Ley",
 		trigger_leyBeamAfflicted = "afflicted by Guided Ley",
@@ -198,8 +195,9 @@ local timer = {
 	leyLineCD = { 45, 55 },
 	leyLineCast = 3,
 	summonSeekerCast = 2,
+	summonSeekerCD = { 27, 37 },
 	summonWhelpsCast = 2,
-	summonCD = { 30, 40 },
+	summonWhelpsCD = { 30, 35 },
 	affinity = 15,
 	initalBeamCD = 28,
 	beam = 13, -- 10 sec duration, starts 3 sec after initial targeting buff
@@ -208,7 +206,6 @@ local timer = {
 
 local icon = {
 	leyLine = "Spell_Arcane_PortalIronForge",
-	summonCD = "INV_Misc_Head_Dragon_Blue",
 	greenAffinity = "Spell_Nature_AbolishMagic",
 	blackAffinity = "Spell_Shadow_ShadowBolt",
 	redAffinity = "Spell_Fire_FlameBolt",
@@ -218,6 +215,8 @@ local icon = {
 	surge = "Spell_Shadow_SiphonMana",
 	beam = "Spell_Arcane_StarFire",
 	blizzard = "Spell_Frost_IceStorm",
+	summonSeekerCD = "Ability_Mount_WhiteDireWolf",
+	summonWhelpsCD = "Ability_Mount_WhiteDireWolf",
 	berserk = "Spell_Nature_Reincarnation"
 }
 
@@ -289,7 +288,6 @@ function module:OnSetup()
 	self.curseWarned = nil
 	self.hitEightyFive = nil
 	self.seekersLeft = 4
-	self.lastSeekerSummon = 0
 end
 
 function module:OnEngage()
@@ -315,7 +313,8 @@ function module:OnDisengage()
 	if self:IsEventScheduled("CheckBossHealth") then
 		self:CancelScheduledEvent("CheckBossHealth")
 	end
-	self:CancelDelayedBar(L["bar_summonCD"])
+	self:CancelDelayedBar(L["bar_summonSeekerCD"])
+	self:CancelDelayedBar(L["bar_summonWhelpsCD"])
 end
 
 function module:IncantagosCastEvent(casterGuid, targetGuid, eventType, spellId, castTime)
@@ -469,23 +468,26 @@ function module:BigWigs_RecvSync(sync, rest, nick)
 end
 
 function module:SummonSeeker()
-	self:CancelDelayedBar(L["bar_summonCD"])
-	self:RemoveBar(L["bar_summonCD"])
-	self.lastSeekerSummon = GetTime()
+	self:CancelDelayedBar(L["bar_summonSeekerCD"])
+	self:RemoveBar(L["bar_summonSeekerCD"])
 	if self.db.profile.summonseeker then
 		self:Message(L["msg_summonSeeker"], "Attention")
+		local delay = timer.summonSeekerCast
+		local nextMin = timer.summonSeekerCD[1] - delay
+		local nextMax = timer.summonSeekerCD[2] - delay
+		self:DelayedIntervalBar(delay, L["bar_summonSeekerCD"], nextMin, nextMax, icon.summonSeekerCD, true, "White")
 	end
 end
 
 function module:SummonWhelps()
+	self:CancelDelayedBar(L["bar_summonWhelpsCD"])
+	self:RemoveBar(L["bar_summonWhelpsCD"])
 	if self.db.profile.summonwhelps then
 		self:Message(L["msg_summonWhelps"], "Attention")
-	end
-	if self.db.profile.summoncd then
-		local delay = 5
-		local nextSeekerMin = timer.summonCD[1] + self.lastSeekerSummon - GetTime() - delay
-		local nextSeekerMax = timer.summonCD[2] + self.lastSeekerSummon - GetTime() - delay
-		self:DelayedIntervalBar(delay, L["bar_summonCD"], nextSeekerMin, nextSeekerMax, icon.summonCD, true, "White")
+		local delay = timer.summonWhelpsCast
+		local nextMin = timer.summonWhelpsCD[1] - delay
+		local nextMax = timer.summonWhelpsCD[2] - delay
+		self:DelayedIntervalBar(delay, L["bar_summonWhelpsCD"], nextMin, nextMax, icon.summonWhelpsCD, true, "White")
 	end
 end
 

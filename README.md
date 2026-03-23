@@ -1,3 +1,7 @@
+Differences between Elesion's BigWigs and this fork:
+* Incantagos has individual summon timers for Ley-Seekers and Whelps instead of one unified timer.
+* The C'Thun map now appears when the C'Thun module is activated(it used to appear only on pull). This gives players plenty of time to see where they are and where to go before the fight starts.
+
 # BigWigs Golden Edition
 Big updates to K40 and MC (**check your boss settings!**), small fixes and updates here and there. Mostly tested.
 
